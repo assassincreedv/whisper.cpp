@@ -12,6 +12,8 @@
 #include <vector>
 #include <cstring>
 #include <sstream>
+#include <chrono>
+
 
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
@@ -93,6 +95,8 @@ struct whisper_params {
 
     std::string dtw = "";
 };
+
+auto server_start_time = std::chrono::steady_clock::now();
 
 void whisper_print_usage(int /*argc*/, char ** argv, const whisper_params & params, const server_params& sparams) {
     fprintf(stderr, "\n");
@@ -678,6 +682,17 @@ int main(int argc, char ** argv) {
     svr.Get(sparams.request_path + "/", [&default_content](const Request &, Response &res){
         res.set_content(default_content, "text/html");
         return false;
+    });
+
+    svr.Get(sparams.request_path + "/health", [](const Request &, Response &res) {
+        auto now = std::chrono::steady_clock::now();
+        auto uptime_seconds = std::chrono::duration_cast<std::chrono::seconds>(now - server_start_time).count();
+
+        const std::string health_response = R"({
+            "status": "healthy",
+            "uptime_seconds": )" + std::to_string(uptime_seconds) + R"(
+        })";
+        res.set_content(health_response, "application/json");
     });
 
     svr.Options(sparams.request_path + sparams.inference_path, [&](const Request &, Response &){
